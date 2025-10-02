@@ -2,159 +2,153 @@ import tkinter as tk
 from tkinter import ttk
 import pyjokes as pj
 
-style = ttk.Style()
-style.theme_use("default")
 
-style.configure("TFrame", background="#1e1e1e")
-style.configure("TLabel", background="#1e1e1e",
-                foreground="#f5f5f5", font=("Helvetica", 12))
-style.configure("TButton", background="#2c2c2c",
-                foreground="#f5f5f5", font=("Helvetica", 11))
-style.map("TButton", background=[
-          ("active", "#00adb5")], foreground=[("active", "#ffffff")])
+class DevJokesApp(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("Dev Jokes")
+        self.configure(bg='#1e1e1e')
 
-# Function to create widgets with all options
+        self._setup_styles()
+        self._setup_widgets()
+
+    # ---------- Styles ----------
+    def _setup_styles(self):
+        style = ttk.Style(self)
+        style.theme_use("default")
+
+        style.configure("TFrame", background="#1e1e1e")
+        style.configure("TLabel",
+                        background="#1e1e1e",
+                        foreground="#f5f5f5",
+                        font=("Helvetica", 12))
+        style.configure("TButton",
+                        background="#2c2c2c",
+                        foreground="#f5f5f5",
+                        font=("Helvetica", 11))
+        style.map("TButton",
+                  background=[("active", "#00adb5")],
+                  foreground=[("active", "#ffffff")])
+
+    # ---------- Widgets ----------
+    def _setup_widgets(self):
+        # Header
+        frame = ttk.Frame(self)
+        frame.pack(padx=20, pady=20)
+
+        label = ttk.Label(frame, text='Jokes for Programers',
+                          font=('Helvetica', 16, 'bold'))
+        label.pack()
+
+        # Buttons
+        button_frame = ttk.Frame(self)
+        button_frame.pack(pady=10)
+
+        buttons_info = [
+            ('Get Joke', self.get_joke),
+            ('Get All Jokes', self.show_all_jokes),
+            ('Clear', self.clear_jokes),
+        ]
+
+        for text, cmd in buttons_info:
+            ttk.Button(button_frame, text=text, command=cmd).pack(
+                side=tk.LEFT, padx=5)
+
+        # Radio buttons (joke type)
+        radio_frame = ttk.Frame(self)
+        radio_frame.pack(pady=10)
+
+        self.joke_type = tk.StringVar(value='all')
+
+        for text, val in [('All', 'all'), ('Chuck', 'chuck'), ('Neutral', 'neutral')]:
+            ttk.Radiobutton(radio_frame, text=text, variable=self.joke_type,
+                            value=val).pack(side=tk.LEFT, padx=5)
+
+        # Language Listbox
+        listbox_frame = ttk.Frame(self)
+        listbox_frame.pack(pady=10)
+
+        self.lb_languages = tk.Listbox(listbox_frame, height=8)
+        self.lb_languages.pack(side=tk.LEFT)
+
+        self.language_map = {
+            'English': 'en', 'Czech': 'cs', 'German': 'de', 'Spanish': 'es',
+            'Basque': 'eu', 'French': 'fr', 'Galician': 'gl', 'Hungarian': 'hu',
+            'Italian': 'it', 'Lithuanian': 'lt', 'Polish': 'pl', 'Russian': 'ru',
+            'Swedish': 'sv', 'Turkish': 'tr'
+        }
+
+        for name in self.language_map.keys():
+            self.lb_languages.insert(tk.END, name)
+
+        # Default select English (first item) on startup
+        self.lb_languages.selection_set(0)
+
+        # Joke display with scrollbar
+        message_frame = ttk.Frame(self)
+        message_frame.pack(pady=10)
+
+        self.joke_text = tk.Text(
+            message_frame, wrap='word', height=10, width=50)
+        self.joke_text.pack(side=tk.LEFT, padx=10, pady=10)
+
+        scrollbar = ttk.Scrollbar(
+            message_frame, orient='vertical', command=self.joke_text.yview)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        self.joke_text.configure(yscrollcommand=scrollbar.set)
+
+        # Status bar
+        self.status_var = tk.StringVar()
+        self.status_bar = ttk.Label(self, textvariable=self.status_var,
+                                    style='Status.TLabel', anchor='w')
+        self.status_bar.pack(side=tk.BOTTOM, fill=tk.X)
+
+        # Initialize status with defaults
+        self._update_status('Ready')
+
+    # ---------- Utility Methods ----------
+    def _update_status(self, context=''):
+        lang = self.get_selected_language().upper()
+        category = self.joke_type.get()
+        msg = f'Lang: {lang} | Category: {category}'
+        if context:
+            msg = f'{context} -> {msg}'
+        self.status_var.set(msg)
+
+    def get_selected_language(self):
+        selection = self.lb_languages.curselection()
+        if selection:
+            return self.language_map[self.lb_languages.get(selection[0])]
+        return 'en'
+
+    # ---------- Actions ----------
+    def get_joke(self):
+        lang = self.get_selected_language()
+        category = self.joke_type.get()
+        self.joke_text.delete('1.0', tk.END)
+        try:
+            joke = pj.get_joke(language=lang, category=category)
+            self.joke_text.insert(tk.END, joke)
+            self._update_status('1 joke shown')
+        except Exception:
+            self.joke_text.insert(
+                tk.END, f"No jokes found for {category} in {lang.upper()}."
+            )
+            self._update_status('No jokes found')
+
+    def show_all_jokes(self):
+        jokes = pj.get_jokes()
+        self.joke_text.delete('1.0', tk.END)
+        self.joke_text.insert(tk.END, '\n\n'.join(jokes))
+        self._update_status(f'{len(jokes)} jokes shown')
+
+    def clear_jokes(self):
+        self.joke_text.delete('1.0', tk.END)
+        self._update_status('Cleared jokes')
 
 
-def create_widget(parent, widget_type, **options):
-    return widget_type(parent, **options)
-
-
-def create_button(parent, text, fg):
-    return create_widget(parent, ttk.Button, text=text, cursor='hand2')
-
-
-def create_radio(parent, text, fg):
-    return create_widget(parent, ttk.Radiobutton, text=text, cursor='hand2')
-
-
-def create_listbox(parent):
-    return create_widget(parent, tk.Listbox, cursor='hand2')
-
-
-def get_selected_language():
-    try:
-        selection = lb_languages.curselection()[0]
-        display_name = lb_languages.get(selection)
-        return language_map[display_name]
-    except IndexError:
-        return "en"
-
-
-def create_messagebox(parent):
-    return create_widget(parent, ttk.Message, cursor='hand2')
-
-
-def get_joke():
-    lang = get_selected_language()
-    type_choice = joke_type.get()
-    try:
-        joke = pj.get_joke(language=lang, category=type_choice)
-        joke_text.delete("1.0", tk.END)
-        joke_text.insert(tk.END, joke)
-    except Exception as e:
-        joke_text.delete("1.0", tk.END)
-        joke_text.insert(
-            tk.END, f"No jokes found for {type_choice} in {lang.upper()}.")
-
-
-def show_all_jokes():
-    jokes = pj.get_jokes()
-    all_jokes = "\n\n".join(jokes)
-    joke_text.delete("1.0", tk.END)
-    joke_text.insert(tk.END, all_jokes)
-
-
-def clear_jokes():
-    joke_text.delete("1.0", tk.END)
-    joke_text.insert(tk.END, "")
-
-
-# Create the main window
-window = create_widget(None, tk.Tk)
-window.title("Dev Jokes")
-window.configure(bg="#1e1e1e")
-
-# Create a Frame widget with all options
-frame = create_widget(window, ttk.Frame, cursor='hand2',
-                      height=100, width=200)
-frame.pack(padx=20, pady=20)
-
-# Create Label widget with all options
-label = create_widget(frame, ttk.Label, text='Jokes for Programmers',
-                      font='50', cursor='hand2')
-label.pack()
-
-# Create a frame for buttons
-button_frame = create_widget(
-    window, ttk.Frame, cursor='hand2', height=50, width=200)
-button_frame.pack(pady=10)
-
-# Create buttons
-buttons_info = [("Get Joke", "red", get_joke),
-                ("Get All Jokes", "brown", show_all_jokes), ("Clear", "blue", clear_jokes)]
-
-for text, fg, cmd in buttons_info:
-    button = create_button(button_frame, text=text, fg=fg)
-    button.config(command=cmd)
-    button.pack(side=tk.LEFT)
-
-# Create a frame for radios
-radio_frame = create_widget(
-    window, ttk.Frame, cursor='hand2')
-radio_frame.pack(pady=10)
-
-joke_type = tk.StringVar(value="all")
-
-# Create radios
-radios_info = [
-    ("All", "green", "all"),
-    ("Chuck", "purple", "chuck"),
-    ("Neutral", "orange", "neutral")
-]
-
-for text, fg, val in radios_info:
-    radio = create_radio(radio_frame, text=text, fg=fg)
-    radio.config(variable=joke_type, value=val)
-    radio.pack(side=tk.LEFT)
-
-# Create a frame for listbox
-listbox_frame = create_widget(
-    window, ttk.Frame, cursor='hand2')
-listbox_frame.pack(pady=10)
-
-# Create radios
-lb_languages = create_listbox(listbox_frame)
-
-language_map = {
-    "English": "en",
-    "Czech": "cs",
-    "German": "de",
-    "Spanish": "es",
-    "Basque": "eu",
-    "French": "fr",
-    "Galician": "gl",
-    "Hungarian": "hu",
-    "Italian": "it",
-    "Lithuanian": "lt",
-    "Polish": "pl",
-    "Russian": "ru",
-    "Swedish": "sv",
-    "Turkish": "tr"
-}
-
-for name in language_map.keys():
-    lb_languages.insert(tk.END, name)
-
-lb_languages.pack(side=tk.LEFT)
-
-message_frame = create_widget(
-    window, ttk.Frame, cursor='hand2', height=50, width=200)
-message_frame.pack(pady=10)
-
-joke_text = tk.Text(message_frame, wrap="word",
-                    height=10, width=50)
-joke_text.pack(padx=10, pady=10)
-
-# Run the Tkinter event loop
-window.mainloop()
+# ---------- Run App ----------
+if __name__ == '__main__':
+    app = DevJokesApp()
+    app.mainloop()
